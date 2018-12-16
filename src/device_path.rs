@@ -17,7 +17,7 @@ use ffi::{
 use {EfiError, EfiErrorKind, Result, utils::as_slice};
 use core::{mem, ptr, fmt, slice};
 use system_table;
-use alloc::{String, boxed::Box, Vec};
+use alloc::{string::String, boxed::Box, vec::Vec};
 
 // TODO: the whole concept of wrapping device path pointers like
 // this is not safe. We need to analyze memory lifetimes etc.
@@ -25,10 +25,10 @@ use alloc::{String, boxed::Box, Vec};
 
 // TODO: Deallocate underlying inner pointer in drop. Blocked on proper implementation of Box on this platform
 // TODO: Do we need to clean up the path_utils fucker as well on drop?
-pub struct DeviceNode 
+pub struct DeviceNode
 {
     inner: *const EFI_DEVICE_PATH_PROTOCOL, // TODO: instead of raw ptr can we carry this in some sort of Box for UEFI (normal box doesn't work apparently)
-    
+
     // TODO: This thing needs to be wrapped in RC-like ref counting mechanism
     // Otherwise we have a shaky situation with respect to Clone
     path_utils: *mut EFI_DEVICE_PATH_UTILITIES_PROTOCOL, // Carrying this around so that we don't have to ask for it 'cause that operation is fallible and don't want to fail later (fucks up Clone impl for example)
@@ -47,7 +47,7 @@ impl DeviceNode {
             ptr::copy_nonoverlapping(data.as_ptr(), node_data_start, data.len());
             node
         };
-        
+
         Ok(Self { inner, path_utils })
     }
 
@@ -87,7 +87,7 @@ impl fmt::Display for DeviceNode {
 // TODO: Do we need to clean up the path_utils fucker as well on drop?
 pub struct DevicePath {
     inner: *const EFI_DEVICE_PATH_PROTOCOL, // TODO: instead of raw ptr can we carry this in some sort of Box for UEFI (normal box doesn't work apparently)
-    
+
     // TODO: This thing needs to be wrapped in RC-like ref counting mechanism
     // Otherwise we have a shaky situation with respect to Clone
     path_utils: *mut EFI_DEVICE_PATH_UTILITIES_PROTOCOL, // Carrying this around so that we don't have to ask for it 'cause that operation is fallible and don't want to fail later (fucks up Clone impl for example)
@@ -159,8 +159,8 @@ fn to_string(path: *const EFI_DEVICE_PATH_PROTOCOL, is_single_node: bool) -> Res
 
     let utf8_string = String::from_utf16(utf16_buf).map_err(|_| EfiError::from(EfiErrorKind::DeviceError))?; // TODO: Can we do something to propagate the underlying error?
 
-    // TODO: the below is dangerous. There are no guarantees how Box 
-    // will release this ptr, but we hope it'll call our allocator 
+    // TODO: the below is dangerous. There are no guarantees how Box
+    // will release this ptr, but we hope it'll call our allocator
     // which in turn will call UEFI's heap free routine.
     // Secondly, won't the compiler optimize this statement away?
     unsafe { Box::from_raw(text_ptr) };
@@ -193,7 +193,7 @@ fn path_utils() -> Result<*mut EFI_DEVICE_PATH_UTILITIES_PROTOCOL> {
     Ok(utils)
 }
 
-pub fn create_file_path_node<P: AsRef<str>>(relative_file_path: P) -> Result<DeviceNode> { // TODO: return value should be strongly typed as FileDeviceNode 
+pub fn create_file_path_node<P: AsRef<str>>(relative_file_path: P) -> Result<DeviceNode> { // TODO: return value should be strongly typed as FileDeviceNode
     let relative_file_path = relative_file_path.as_ref();
 
     // Convert to UTF16, becuase UEFI expects UCS-2 (We can't do anything about non-representable code points coming from UTF8)
@@ -204,7 +204,7 @@ pub fn create_file_path_node<P: AsRef<str>>(relative_file_path: P) -> Result<Dev
     DeviceNode::new(MEDIA_DEVICE_PATH, MEDIA_FILEPATH_DP, bytes_buf)
 }
 
-pub fn append_path(path1: &DevicePath, path2: &DevicePath) -> Result<DevicePath> { // TODO: return value should be strongly typed as FileDevicePath 
+pub fn append_path(path1: &DevicePath, path2: &DevicePath) -> Result<DevicePath> { // TODO: return value should be strongly typed as FileDevicePath
     let dev_path_utils = path_utils()?;
 
     let path = unsafe {

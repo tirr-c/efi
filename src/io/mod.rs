@@ -276,10 +276,9 @@
 //! [`.unwrap()`]: ../result/enum.Result.html#method.unwrap
 
 use core::cmp;
-use core::str as core_str;
 use core::fmt;
 use core::result;
-use alloc::{String, Vec};
+use alloc::{string::String, vec::Vec};
 use core::str;
 use core::ptr;
 
@@ -1957,9 +1956,17 @@ impl<R: Read> Iterator for Chars<R> {
             Ok(b) => b,
             Err(e) => return Some(Err(CharsError::Other(e))),
         };
-        let width = core_str::utf8_char_width(first_byte);
-        if width == 1 { return Some(Ok(first_byte as char)) }
-        if width == 0 { return Some(Err(CharsError::NotUtf8)) }
+        let width = if first_byte & 0xf0 == 0 {
+            return Some(Ok(first_byte as char));
+        } else if first_byte & 0xc0 == 0xf0 {
+            2
+        } else if first_byte & 0xe0 == 0xc0 {
+            3
+        } else if first_byte & 0xf0 == 0xe0 {
+            4
+        } else {
+            return Some(Err(CharsError::NotUtf8));
+        };
         let mut buf = [first_byte, 0, 0, 0];
         {
             let mut start = 1;

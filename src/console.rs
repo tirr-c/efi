@@ -1,8 +1,8 @@
 use ffi::{
     console::{
-        EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL, 
+        EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL,
         EFI_SIMPLE_TEXT_INPUT_PROTOCOL,
-        EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL, 
+        EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL,
         EFI_KEY_DATA,
         EFI_INPUT_KEY,
         EFI_SHIFT_STATE_VALID,
@@ -32,17 +32,17 @@ use ffi::{
         EFI_BACKGROUND_MAGENTA,
         EFI_BACKGROUND_BROWN,
         EFI_BACKGROUND_LIGHTGRAY,
-    }, 
-    IsSuccess, 
+    },
+    IsSuccess,
     UINTN,
     TRUE,
     FALSE,
 };
-use core::cmp;
+use core::{cmp, intrinsics::transmute};
 use io::{self, Write, Cursor, BufRead, BufReader, LineWriter};
 use ::Result;
 use system_table;
-use alloc::{Vec, String, str, fmt};
+use alloc::{vec::Vec, string::String, str, fmt};
 use TextInputProcolPtr;
 
 // TODO: This whole module has gotten ugly. Needs cleanup.
@@ -262,9 +262,9 @@ impl Console {
             }
 
             fn is_ctr_z(key_data: &EFI_KEY_DATA) -> bool {
-                (key_data.Key.UnicodeChar == 'z' as u16 || key_data.Key.UnicodeChar == 'Z' as u16) && 
+                (key_data.Key.UnicodeChar == 'z' as u16 || key_data.Key.UnicodeChar == 'Z' as u16) &&
                 (key_data.KeyState.KeyShiftState & EFI_SHIFT_STATE_VALID) != 0  &&
-                ((key_data.KeyState.KeyShiftState & EFI_LEFT_CONTROL_PRESSED) != 0 || (key_data.KeyState.KeyShiftState & EFI_RIGHT_CONTROL_PRESSED) != 0) 
+                ((key_data.KeyState.KeyShiftState & EFI_LEFT_CONTROL_PRESSED) != 0 || (key_data.KeyState.KeyShiftState & EFI_RIGHT_CONTROL_PRESSED) != 0)
             }
 
             if key_data.Key.UnicodeChar != 0 { // != 0 means it's a printable unicode char
@@ -403,7 +403,7 @@ impl io::Write for Console {
 
     fn flush(&mut self) -> io::Result<()> {
         Ok(()) // Do nothing. UEFI SIMPLE_TEXT_OUTPUT protocol does not support flushing
-    } 
+    }
 }
 
 
@@ -512,9 +512,4 @@ fn to_ptr<T>(slice: &[T]) -> (*const T, usize) {
     unsafe {
         transmute(slice)
     }
-}
-
-// TODO is this really needed? Doesn't core expose mem::transmute?
-extern "rust-intrinsic" {
-    fn transmute<T,U>(val: T) -> U;
 }

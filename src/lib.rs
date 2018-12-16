@@ -2,22 +2,13 @@
 // TODO: At many places in this crate we're not handling errors well. We're swalling inner errors such as EFI_STATUSes. Fix this situation.
 // TODO: can we use #![no_main] here and avoid having to write a main function
 #![no_std]
-#![feature(intrinsics)]
-#![feature(try_trait)]
 #![feature(alloc)]
-#![feature(global_allocator)]
-#![feature(allocator_api)]
-#![feature(str_internals)] // TODO: this looks very new and unstable. Can we get rid of it?
 #![feature(align_offset)]
 #![recursion_limit="100"] // Needed for the dns module (because it does recursive name resolution)
-#![feature(exact_chunks)]
-#![feature(ptr_internals)]
-#![feature(duration_extras)]
-#![feature(duration_from_micros)]
 
 // #![warn(missing_debug_implementations)]
 
-#[macro_use] extern crate failure;
+extern crate failure;
 #[macro_use] extern crate alloc;
 extern crate byteorder;
 
@@ -34,20 +25,12 @@ pub mod time;
 mod allocator;
 mod boot_services;
 
-// Hack: this std declartion is to work around a bug in failure crate
-// wherein it looks for std even in no_std crates. Will remove it when
-// the bug is fixed.
-mod std {
-    pub use core::option;
-    pub use core::fmt;
-}
-
 use core::{fmt::{Debug, Display, Formatter}, ptr, mem::transmute};
 use ffi::{
     tcp4,
     EFI_STATUS,
     EFI_SYSTEM_TABLE,
-    EFI_HANDLE, 
+    EFI_HANDLE,
     console::{EFI_SIMPLE_TEXT_INPUT_PROTOCOL, EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL, EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID, EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL_GUID},
     boot_services::EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL,
 };
@@ -83,8 +66,8 @@ pub fn image_handle() -> EFI_HANDLE {
 }
 
 
- #[global_allocator]
- static ALLOCATOR: EfiAllocator = EfiAllocator;
+#[global_allocator]
+static ALLOCATOR: EfiAllocator = EfiAllocator;
 
 
 // TODO: instead of calling them errors we should change the name to status and remove Fail etc. from them.
@@ -231,7 +214,7 @@ pub enum EfiErrorKind {
 impl From<EFI_STATUS> for EfiErrorKind {
     fn from(status: ffi::EFI_STATUS) -> Self {
         match status {
-            | ffi::EFI_LOAD_ERROR..=ffi::EFI_IP_ADDRESS_CONFLICT 
+            | ffi::EFI_LOAD_ERROR..=ffi::EFI_IP_ADDRESS_CONFLICT
             | tcp4::EFI_CONNECTION_FIN..=tcp4::EFI_CONNECTION_REFUSED =>  unsafe { transmute(status) },
             _ => EfiErrorKind::UnrecognizedError
         }
@@ -306,7 +289,7 @@ pub enum TextInputProcolPtr {
     InputEx(*mut EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL),
 }
 
-pub struct SystemTable { 
+pub struct SystemTable {
     table_ptr: *const EFI_SYSTEM_TABLE,
     con_in: TextInputProcolPtr,
 }
@@ -314,13 +297,13 @@ pub struct SystemTable {
 impl SystemTable {
     pub fn new(table_ptr: *const EFI_SYSTEM_TABLE) -> Result<Self> {
         //We first try to get the EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL and if it is not supported then
-        //we fallback to EFI_SIMPLE_TEXT_INPUT_PROTOCOL. This is to workaround the behaviour in 
+        //we fallback to EFI_SIMPLE_TEXT_INPUT_PROTOCOL. This is to workaround the behaviour in
         //HP EliteBook 840 G2 Notebook PC where calling the OpenProtocol for the INPUT_EX return EFI_UNSUPPORTED
         match get_simple_text_input_ex(table_ptr) {
             Ok(con_in_ex) => Ok(Self { table_ptr, con_in: TextInputProcolPtr::InputEx(con_in_ex) }),
-            Err(err) => { 
+            Err(err) => {
                 if err.kind() == EfiErrorKind::Unsupported {
-                    return Ok(Self { table_ptr, con_in: TextInputProcolPtr::Input(get_simple_text_input(table_ptr)?) }) 
+                    return Ok(Self { table_ptr, con_in: TextInputProcolPtr::Input(get_simple_text_input(table_ptr)?) })
                 }
                 Err(err)
             }
@@ -341,11 +324,11 @@ fn get_simple_text_input_ex(table_ptr: *const EFI_SYSTEM_TABLE) -> Result<*mut E
 
     let status = unsafe {
         ((*(*table_ptr).BootServices).OpenProtocol)(
-            (*table_ptr).ConsoleInHandle, 
-            &EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL_GUID, 
-            transmute(&mut protocol), 
-            image_handle(), 
-            ptr::null(), 
+            (*table_ptr).ConsoleInHandle,
+            &EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL_GUID,
+            transmute(&mut protocol),
+            image_handle(),
+            ptr::null(),
             EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL)
     };
 
@@ -357,11 +340,11 @@ fn get_simple_text_input(table_ptr: *const EFI_SYSTEM_TABLE) -> Result<*mut EFI_
 
     let status = unsafe {
         ((*(*table_ptr).BootServices).OpenProtocol)(
-            (*table_ptr).ConsoleInHandle, 
-            &EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID, 
-            transmute(&mut protocol), 
-            image_handle(), 
-            ptr::null(), 
+            (*table_ptr).ConsoleInHandle,
+            &EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID,
+            transmute(&mut protocol),
+            image_handle(),
+            ptr::null(),
             EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL)
     };
 

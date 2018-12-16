@@ -3,7 +3,7 @@ use ffi::{
         EFI_PXE_BASE_CODE_PROTOCOL_GUID,
         EFI_PXE_BASE_CODE_PROTOCOL,
         EFI_PXE_BASE_CODE_MODE,
-        EFI_PXE_BASE_CODE_DISCOVER_INFO, 
+        EFI_PXE_BASE_CODE_DISCOVER_INFO,
         EFI_PXE_BASE_CODE_SRVLIST,
         EFI_PXE_BASE_CODE_PACKET,
         EFI_PXE_BASE_CODE_DHCPV4_PACKET,
@@ -38,18 +38,18 @@ use {
     boot_services::locate_handles,
 };
 
-use core::{self, slice, mem, ptr, default::Default};
+use core::{self, mem, ptr, default::Default};
 use utils::{to_ptr, Wrapper, to_opt};
-use alloc::{String, Vec};
+use alloc::{string::String, vec::Vec};
 
-// TODO: THIS WHOLE MODULE NEEDS A COMPLETE OVERHAUL. 
+// TODO: THIS WHOLE MODULE NEEDS A COMPLETE OVERHAUL.
 // The API surface area needs to be complete redesigned including things like:
 // - exposing dhcp and pxe input params wherever needed
 // - renaming publicly visible to types to make them less awkward and truer to the nature of dhcp/pxe
 // Also need to remove needless thin wrapper types like Mode etc. Will use raw types in their stead.
 
 
-// TODO: eventually use more specific errors like below instead of 
+// TODO: eventually use more specific errors like below instead of
 // blindly returning that EfiError shit
 // enum DhcpErrorKind {
 //     NoOffer,
@@ -128,7 +128,7 @@ impl DhcpConfig {
     pub fn dns_server_addrs(&self) -> &[IpAddr] {
         self.dns_server_addrs.as_slice()
     }
- 
+
     pub fn dhcp_ack_packet(&self) -> Option<&Dhcpv4Packet> {
         self.dhcp_ack_packet.as_ref()
     }
@@ -144,11 +144,11 @@ impl DhcpConfig {
     fn extract_ip_addrs(mode: &Mode, op_code: u8) -> Option<Vec<IpAddr>> {
         let option = mode.dhcp_ack().as_dhcpv4().dhcp_option(op_code)?;
         let val = option.value()?;
-        // Using explicit invocation syntax for 'exact_chunks' because of a compiler bug which leads to 
+        // Using explicit invocation syntax for 'exact_chunks' because of a compiler bug which leads to
         // multiple candidates found for this method: https://github.com/rust-lang/rust/issues/51402.
-        // We actually don't even want to use the SliceExt trait but the method on the inherent impl, 
+        // We actually don't even want to use the SliceExt trait but the method on the inherent impl,
         // but I couldn't find a way to do it. This shit has been fixed in latest Rust. So will address it when we upgrade
-        let addrs = slice::SliceExt::exact_chunks(val, 4)
+        let addrs = val.chunks_exact(4)
             .map(|c| IpAddr::V4(Ipv4Addr::new(c[0], c[1], c[2], c[3])))
             .collect::<Vec<_>>();
 
@@ -174,7 +174,7 @@ impl BootServerConfig {
 
     pub fn boot_server_ip(&self) -> IpAddr {
         self.boot_server_ip
-    } 
+    }
 
     pub fn boot_file(&self) -> &str {
         &self.boot_file
@@ -228,9 +228,9 @@ impl PxeBaseCodeProtocol {
         to_res((), status)
     }
 
-    fn set_packets(&self, 
-        new_dhcp_discover_valid: Option<bool>, 
-        new_dhcp_ack_received: Option<bool>, 
+    fn set_packets(&self,
+        new_dhcp_discover_valid: Option<bool>,
+        new_dhcp_ack_received: Option<bool>,
         new_proxy_offer_received: Option<bool>,
         new_pxe_discover_valid: Option<bool>,
         new_pxe_reply_received: Option<bool>,
@@ -259,7 +259,7 @@ impl PxeBaseCodeProtocol {
                                 to_ptr(new_pxe_reply),
                                 to_ptr(new_pxe_bis_reply));
             to_res((), status)
-        } 
+        }
 
     // TODO: some missing methods here
     fn mode(&self) -> Option<&Mode> {
@@ -303,11 +303,11 @@ impl PxeBaseCodeProtocol {
             Ok(protocol)
         }
     }
-    
+
     // TODO expose public apis to check if DHCP has already happned or not.
     // Same for PXE
     // TODO: In case of multiple network cards we'll have to return
-    // multiple configs. We can do that by locating _all_ pxe protocols 
+    // multiple configs. We can do that by locating _all_ pxe protocols
     // and getting config from each.
     pub fn cached_dhcp_config(&self) -> Result<Option<DhcpConfig>> {
         let mode = self.mode().ok_or_else::<EfiError, _>(|| EfiErrorKind::ProtocolError.into())?;
@@ -344,7 +344,7 @@ impl PxeBaseCodeProtocol {
         Ok(config)
     }
 
-    // TODO: allow user to specify discovery options such as whether to do unicast, broadcast or multicast 
+    // TODO: allow user to specify discovery options such as whether to do unicast, broadcast or multicast
     // and list of boot servers to use for unicast etc.
     pub fn run_boot_server_discovery(&self, _dhcp_config: &DhcpConfig) -> Result<BootServerConfig> {
         // We're requring the '_dhcp_config' argument above only to enforce the fact that user should've run DHCP first before calling this method.
@@ -354,7 +354,7 @@ impl PxeBaseCodeProtocol {
         // but we want to get rid of it and its associated types below
         // and use raw ffi types here (except for packet wrapper types etc. we can keep thos)
         // It's too much work to maintain a the set of thin wrappers like this.
-        self.discover(BootType::Bootstrap, BOOT_LAYER_INITIAL, false, Some(&info))?; 
+        self.discover(BootType::Bootstrap, BOOT_LAYER_INITIAL, false, Some(&info))?;
 
         let mode = self.mode().ok_or_else::<EfiError, _>(|| EfiErrorKind::ProtocolError.into())?;
         // TODO: Is it safe to rely on proxy_offer() for getting boot file? Some question:
@@ -482,13 +482,13 @@ impl<'a> Wrapper for DiscoverInfo<'a> {
 // So we may have to create a new type that enforces at least one element requirement instead of taking a ref to a plain array.
 impl<'a> DiscoverInfo<'a> {
     pub fn new(use_mcast: bool, use_bcast: bool, use_ucast: bool, must_use_list: bool, server_mcast_ip: EFI_IP_ADDRESS, srvlist: Option<&'a[SrvListEntry]>) -> Self {
-        Self { 
+        Self {
             inner: EFI_PXE_BASE_CODE_DISCOVER_INFO {
-                UseMCast: to_boolean(use_mcast), 
-                UseBCast: to_boolean(use_bcast), 
-                UseUCast: to_boolean(use_ucast), 
-                MustUseList: to_boolean(must_use_list), 
-                ServerMCastIp: server_mcast_ip, 
+                UseMCast: to_boolean(use_mcast),
+                UseBCast: to_boolean(use_bcast),
+                UseUCast: to_boolean(use_ucast),
+                MustUseList: to_boolean(must_use_list),
+                ServerMCastIp: server_mcast_ip,
                 IpCnt: if let Some(slist) = srvlist { slist.len() as u16 } else { 0 }, // TODO: can we replace this cast with something safer?
                 SrvList: unsafe { if let Some(slist) = srvlist { mem::transmute(slist.as_ptr()) } else { ptr::null()} } // Here be dragons
             },
@@ -537,8 +537,8 @@ impl_wrapper!(SrvListEntry, EFI_PXE_BASE_CODE_SRVLIST);
 
 impl SrvListEntry {
     pub fn new(type_: u16, accept_any_response: bool, reserved: u8, ip_addr: EFI_IP_ADDRESS) -> Self {
-        SrvListEntry ( 
-            EFI_PXE_BASE_CODE_SRVLIST { 
+        SrvListEntry (
+            EFI_PXE_BASE_CODE_SRVLIST {
                 Type: type_,
                 AcceptAnyResponse: to_boolean(accept_any_response),
                 reserved,
@@ -653,7 +653,7 @@ impl Mode {
     pub fn subnet_mask(&self) -> EFI_IP_ADDRESS {
         self.0.SubnetMask
     }
-    
+
     pub fn dhcp_discover(&self) -> &Packet {
         unsafe { mem::transmute(&self.0.DhcpDiscover) }
     }
@@ -669,19 +669,19 @@ impl Mode {
     pub fn pxe_discover(&self) -> &Packet {
         unsafe { mem::transmute(&self.0.PxeDiscover) }
     }
-    
+
     pub fn pxe_reply(&self) -> &Packet {
         unsafe { mem::transmute(&self.0.PxeReply) }
     }
-    
+
     pub fn pxe_bis_reply(&self) -> &Packet {
         unsafe { mem::transmute(&self.0.PxeBisReply) }
     }
-    
+
     pub fn ip_filter(&self) -> &IpFilter {
         unsafe { mem::transmute(&self.0.IpFilter) }
     }
-   
+
     pub fn arp_cache(&self) -> &[EFI_PXE_BASE_CODE_ARP_ENTRY] {
         &self.0.ArpCache[..self.0.ArpCacheEntries as usize] // TODO: is this cast to usize safe. Take another look
     }
@@ -731,59 +731,59 @@ impl Dhcpv4Packet {
     pub fn bootp_hw_type(&self) -> u8 {
         self.0.BootpHwType
     }
-    
+
     pub fn bootp_hw_addr_len(&self) -> u8 {
         self.0.BootpHwAddrLen
     }
-    
+
     pub fn bootp_gate_hops(&self) -> u8 {
         self.0.BootpGateHops
     }
-    
+
     pub fn bootp_ident(&self) -> u32 {
         self.0.BootpIdent
     }
-    
+
     pub fn bootp_seconds(&self) -> u16 {
         self.0.BootpSeconds
     }
-    
+
     pub fn bootp_flags(&self) -> u16 {
         self.0.BootpFlags
     }
-    
+
     pub fn bootp_ci_addr(&self) -> &[u8; 4] {
         &self.0.BootpCiAddr
     }
-    
+
     pub fn bootp_yi_addr(&self) -> &[u8; 4] {
         &self.0.BootpYiAddr
     }
-    
+
     pub fn bootp_si_addr(&self) -> &[u8; 4] {
         &self.0.BootpSiAddr
     }
-    
+
     pub fn bootp_gi_addr(&self) -> &[u8; 4] {
         &self.0.BootpGiAddr
     }
-    
+
     pub fn bootp_hw_addr(&self) -> &[u8; 16] {
         &self.0.BootpHwAddr
     }
-    
+
     pub fn bootp_srv_name(&self) -> &[u8; 64] {
         &self.0.BootpSrvName
     }
-    
+
     pub fn bootp_boot_file(&self) -> &[u8; 128] {
         &self.0.BootpBootFile
     }
-    
+
     pub fn dhcp_magik(&self) -> u32 {
         self.0.DhcpMagik
     }
-    
+
     pub fn dhcp_options<'a>(&'a self) -> impl Iterator<Item=DhcpOption<'a>> { //&[u8; 56] {
         DhcpOptionIter { buf: &self.0.DhcpOptions }
     }
@@ -857,7 +857,7 @@ impl Dhcpv6Packet {
     pub fn bit_field(&self) -> u32 { // Contains both MessageType and TransactionId as bit fields
         self.0.BitField
     }
-    
+
     // TODO: Do DHCPv6 options have the same format as DHCPv4 and therefore is it safe to use the same parsing code for them?
     pub fn dhcp_options<'a>(&'a self) -> impl Iterator<Item=DhcpOption<'a>> {
         DhcpOptionIter { buf: &self.0.DhcpOptions }
@@ -873,7 +873,7 @@ impl IpFilter {
     pub fn filters(&self) -> u8 {
         self.0.Filters
     }
-    
+
     pub fn reserved(&self)  -> u16 {
         self.0.reserved
     }
@@ -935,8 +935,8 @@ impl TftpError {
         &self.0.ErrorString
     }
 }
- 
-// TODO: Move all of this DHCP parsing code into a separate crate (called dhcparse) 
+
+// TODO: Move all of this DHCP parsing code into a separate crate (called dhcparse)
 // so other applications, such as those for testing, can use it as well.
 pub struct DhcpOption<'a> {
     code: u8,
@@ -973,10 +973,10 @@ impl<'a> Iterator for DhcpOptionIter<'a> {
         // The below would've been so simple with slice patterns, but they aren't close to stable yet :(
         const OPTION_END_CODE: u8 = 255;
         let (code, len, val) = {
-            // as per RFC2132 a valid option must have code and length fields. 
+            // as per RFC2132 a valid option must have code and length fields.
             // Therefore it must have at least two elements otherwise we end here.
             // We also end if we have reached option end code
-            if self.buf.len() < 2 || self.buf[0] == OPTION_END_CODE { 
+            if self.buf.len() < 2 || self.buf[0] == OPTION_END_CODE {
                 self.buf = &[]; // Assign to empty slice so that subsequent calls to this method also end up here
                 return None;
             }
@@ -988,7 +988,7 @@ impl<'a> Iterator for DhcpOptionIter<'a> {
                 self.buf = &[]; // Assign to empty slice so that subsequent calls to this method also end up here
                 return None;
             }
-            
+
             let val = match remaining.len() {
                 0 => None,
                 _ => Some(&remaining[..len])

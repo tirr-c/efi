@@ -1,7 +1,7 @@
 use core::{
-    mem, fmt, cmp::Ordering, 
+    mem, fmt, cmp::Ordering,
     ops::{DerefMut, Deref},
-    borrow, ptr::{self, Unique}
+    borrow, ptr::{self, NonNull}
 };
 use ffi::{
     boot_services::EFI_MEMORY_TYPE,
@@ -10,7 +10,7 @@ use ffi::{
 };
 use {system_table, Result};
 
-pub struct EfiBox<T>(Unique<T>);
+pub struct EfiBox<T>(NonNull<T>);
 
 impl<T> EfiBox<T> {
     #[inline]
@@ -19,7 +19,7 @@ impl<T> EfiBox<T> {
         let status = ((*system_table().BootServices).AllocatePool)(EFI_MEMORY_TYPE::EfiLoaderData, size, &mut ptr);
         match status {
             EFI_SUCCESS => {
-                let unique = Unique::new_unchecked(ptr as *mut T);
+                let unique = NonNull::new_unchecked(ptr as *mut T);
                 Ok(EfiBox(unique))
             },
             e => Err(e.into()),
@@ -28,7 +28,7 @@ impl<T> EfiBox<T> {
 
     #[inline]
     pub unsafe fn from_raw(raw: *mut T) -> Self {
-        EfiBox(Unique::new_unchecked(raw))
+        EfiBox(NonNull::new_unchecked(raw))
     }
 
     #[inline]
@@ -108,7 +108,7 @@ impl<T: fmt::Debug> fmt::Debug for EfiBox<T> {
 impl<T> fmt::Pointer for EfiBox<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // It's not possible to extract the inner Uniq directly from the EfiBox,
-        // instead we cast it to a *const which aliases the Unique
+        // instead we cast it to a *const which aliases the NonNull
         let ptr: *const T = &**self;
         fmt::Pointer::fmt(&ptr, f)
     }
